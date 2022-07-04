@@ -70,6 +70,18 @@ var (
 		NewEIP2930Signer(big.NewInt(1)),
 		common.Hex2Bytes("c9519f4f2b30335884581971573fadf60c6204f59a911df35ee8a540456b266032f1e8e2c5dd761f9e4f88f41c8310aeaba26a8bfcdacfedfa12ec3862d3752101"),
 	)
+
+	emptyNewFieldTx = NewTx(&NewFieldTx{
+		ChainID:   big.NewInt(1),
+		Nonce:     3,
+		GasFeeCap: big.NewInt(1e14),
+		GasTipCap: big.NewInt(1),
+		Gas:       25000,
+		To:        &testAddr,
+		Value:     big.NewInt(10),
+		Data:      common.FromHex("5544"),
+		NewField:  common.FromHex("353535"),
+	})
 )
 
 func TestDecodeEmptyTypedTx(t *testing.T) {
@@ -88,6 +100,13 @@ func TestTransactionSigHash(t *testing.T) {
 	}
 	if homestead.Hash(rightvrsTx) != common.HexToHash("fe7a79529ed5f7c3375d06b26b186a8644e0e16c373d7a12be41c62d6042b77a") {
 		t.Errorf("RightVRS transaction hash mismatch, got %x", rightvrsTx.Hash())
+	}
+}
+
+func TestNewFieldTransactionSigHash(t *testing.T) {
+	nfs := NewParisSigner(big.NewInt(1))
+	if nfs.Hash(emptyNewFieldTx) != common.HexToHash("0xa3718a2a6d358b80e6e2d2006cea017ad85f3dc7dbe8150fb791bf524c9fd526") {
+		t.Errorf("empty transaction hash mismatch, got %s", emptyNewFieldTx.Hash())
 	}
 }
 
