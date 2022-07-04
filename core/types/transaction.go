@@ -596,11 +596,12 @@ type Message struct {
 	gasFeeCap  *big.Int
 	gasTipCap  *big.Int
 	data       []byte
+	newField   []byte
 	accessList AccessList
 	isFake     bool
 }
 
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool) Message {
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, newField []byte, accessList AccessList, isFake bool) Message {
 	return Message{
 		from:       from,
 		to:         to,
@@ -611,6 +612,7 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 		gasFeeCap:  gasFeeCap,
 		gasTipCap:  gasTipCap,
 		data:       data,
+		newField:   newField,
 		accessList: accessList,
 		isFake:     isFake,
 	}
@@ -627,6 +629,7 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 		to:         tx.To(),
 		amount:     tx.Value(),
 		data:       tx.Data(),
+		newField:   tx.NewField(),
 		accessList: tx.AccessList(),
 		isFake:     false,
 	}
