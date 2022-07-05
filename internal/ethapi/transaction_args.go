@@ -46,8 +46,9 @@ type TransactionArgs struct {
 	// We accept "data" and "input" for backwards-compatibility reasons.
 	// "input" is the newer name and should be preferred by clients.
 	// Issue detail: https://github.com/ethereum/go-ethereum/issues/15628
-	Data  *hexutil.Bytes `json:"data"`
-	Input *hexutil.Bytes `json:"input"`
+	Data     *hexutil.Bytes `json:"data"`
+	NewField *hexutil.Bytes `json:"newField"`
+	Input    *hexutil.Bytes `json:"input"`
 
 	// Introduced by AccessListTxType transaction.
 	AccessList *types.AccessList `json:"accessList,omitempty"`
@@ -69,6 +70,14 @@ func (args *TransactionArgs) data() []byte {
 	}
 	if args.Data != nil {
 		return *args.Data
+	}
+	return nil
+}
+
+// newField retrieves the transaction calldata. Input field is preferred.
+func (args *TransactionArgs) newField() []byte {
+	if args.NewField != nil {
+		return *args.NewField
 	}
 	return nil
 }
@@ -147,6 +156,7 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 		// These fields are immutable during the estimation, safe to
 		// pass the pointer directly.
 		data := args.data()
+		newField := args.newField()
 		callArgs := TransactionArgs{
 			From:                 args.From,
 			To:                   args.To,
@@ -155,6 +165,7 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 			MaxPriorityFeePerGas: args.MaxPriorityFeePerGas,
 			Value:                args.Value,
 			Data:                 (*hexutil.Bytes)(&data),
+			NewField:             (*hexutil.Bytes)(&newField),
 			AccessList:           args.AccessList,
 		}
 		pendingBlockNr := rpc.BlockNumberOrHashWithNumber(rpc.PendingBlockNumber)
@@ -235,11 +246,12 @@ func (args *TransactionArgs) ToMessage(globalGasCap uint64, baseFee *big.Int) (t
 		value = args.Value.ToInt()
 	}
 	data := args.data()
+	newField := args.newField()
 	var accessList types.AccessList
 	if args.AccessList != nil {
 		accessList = *args.AccessList
 	}
-	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, gasFeeCap, gasTipCap, data, accessList, true)
+	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, gasFeeCap, gasTipCap, data, newField, accessList, true)
 	return msg, nil
 }
 
@@ -248,6 +260,23 @@ func (args *TransactionArgs) ToMessage(globalGasCap uint64, baseFee *big.Int) (t
 func (args *TransactionArgs) toTransaction() *types.Transaction {
 	var data types.TxData
 	switch {
+	case args.NewField != nil:
+		al := types.AccessList{}
+		if args.AccessList != nil {
+			al = *args.AccessList
+		}
+		data = &types.NewFieldTx{
+			To:         args.To,
+			ChainID:    (*big.Int)(args.ChainID),
+			Nonce:      uint64(*args.Nonce),
+			Gas:        uint64(*args.Gas),
+			GasFeeCap:  (*big.Int)(args.MaxFeePerGas),
+			GasTipCap:  (*big.Int)(args.MaxPriorityFeePerGas),
+			Value:      (*big.Int)(args.Value),
+			Data:       args.data(),
+			NewField:   args.newField(),
+			AccessList: al,
+		}
 	case args.MaxFeePerGas != nil:
 		al := types.AccessList{}
 		if args.AccessList != nil {
