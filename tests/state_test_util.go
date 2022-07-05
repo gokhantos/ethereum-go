@@ -70,9 +70,10 @@ type stPostState struct {
 	TxBytes         hexutil.Bytes         `json:"txbytes"`
 	ExpectException string                `json:"expectException"`
 	Indexes         struct {
-		Data  int `json:"data"`
-		Gas   int `json:"gas"`
-		Value int `json:"value"`
+		Data     int `json:"data"`
+		NewField int `json:"newField"`
+		Gas      int `json:"gas"`
+		Value    int `json:"value"`
 	}
 }
 
@@ -107,6 +108,7 @@ type stTransaction struct {
 	Nonce                uint64              `json:"nonce"`
 	To                   string              `json:"to"`
 	Data                 []string            `json:"data"`
+	NewField             []string            `json:"newField"`
 	AccessLists          []*types.AccessList `json:"accessLists,omitempty"`
 	GasLimit             []uint64            `json:"gasLimit"`
 	Value                []string            `json:"value"`
@@ -320,6 +322,7 @@ func (tx *stTransaction) toMessage(ps stPostState, baseFee *big.Int) (core.Messa
 		return nil, fmt.Errorf("tx gas limit index %d out of bounds", ps.Indexes.Gas)
 	}
 	dataHex := tx.Data[ps.Indexes.Data]
+	newFieldHex := tx.NewField[ps.Indexes.NewField]
 	valueHex := tx.Value[ps.Indexes.Value]
 	gasLimit := tx.GasLimit[ps.Indexes.Gas]
 	// Value, Data hex encoding is messy: https://github.com/ethereum/tests/issues/203
@@ -334,6 +337,10 @@ func (tx *stTransaction) toMessage(ps stPostState, baseFee *big.Int) (core.Messa
 	data, err := hex.DecodeString(strings.TrimPrefix(dataHex, "0x"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid tx data %q", dataHex)
+	}
+	newField, err := hex.DecodeString(strings.TrimPrefix(newFieldHex, "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid tx data %q", newFieldHex)
 	}
 	var accessList types.AccessList
 	if tx.AccessLists != nil && tx.AccessLists[ps.Indexes.Data] != nil {
@@ -359,7 +366,7 @@ func (tx *stTransaction) toMessage(ps stPostState, baseFee *big.Int) (core.Messa
 	}
 
 	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, gasPrice,
-		tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, accessList, false)
+		tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, newField, accessList, false)
 	return msg, nil
 }
 
