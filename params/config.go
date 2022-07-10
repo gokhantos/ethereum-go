@@ -735,6 +735,7 @@ type Rules struct {
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon                                      bool
 	IsMerge                                                 bool
+	IsParis                                                 bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -755,6 +756,7 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool) Rules {
 		IsIstanbul:       c.IsIstanbul(num),
 		IsBerlin:         c.IsBerlin(num),
 		IsLondon:         c.IsLondon(num),
+		IsParis:          c.IsParis(num),
 		IsMerge:          isMerge,
 	}
 }
