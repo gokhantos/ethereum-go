@@ -58,6 +58,7 @@ type StateTransition struct {
 	initialGas uint64
 	value      *big.Int
 	data       []byte
+	newField   []byte
 	state      vm.StateDB
 	evm        *vm.EVM
 }
@@ -72,7 +73,7 @@ type Message interface {
 	GasTipCap() *big.Int
 	Gas() uint64
 	Value() *big.Int
-
+	NewField() []byte
 	Nonce() uint64
 	IsFake() bool
 	Data() []byte
@@ -166,6 +167,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 		gasTipCap: msg.GasTipCap(),
 		value:     msg.Value(),
 		data:      msg.Data(),
+		newField:  msg.NewField(),
 		state:     evm.StateDB,
 	}
 }
