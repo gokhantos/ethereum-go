@@ -813,6 +813,7 @@ func (m callMsg) GasTipCap() *big.Int          { return m.CallMsg.GasTipCap }
 func (m callMsg) Gas() uint64                  { return m.CallMsg.Gas }
 func (m callMsg) Value() *big.Int              { return m.CallMsg.Value }
 func (m callMsg) Data() []byte                 { return m.CallMsg.Data }
+func (m callMsg) NewField() []byte             { return m.CallMsg.NewField }
 func (m callMsg) AccessList() types.AccessList { return m.CallMsg.AccessList }
 
 // filterBackend implements filters.Backend to support filtering for logs without
