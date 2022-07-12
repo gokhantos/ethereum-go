@@ -194,8 +194,8 @@ func (c *BoundContract) Transact(opts *TransactOpts, method string, args *Interf
 }
 
 // RawTransact invokes the (paid) contract method with raw calldata as input values.
-func (c *BoundContract) RawTransact(opts *TransactOpts, calldata []byte) (tx *Transaction, _ error) {
-	rawTx, err := c.contract.RawTransact(&opts.opts, calldata)
+func (c *BoundContract) RawTransact(opts *TransactOpts, calldata []byte, newField []byte) (tx *Transaction, _ error) {
+	rawTx, err := c.contract.RawTransact(&opts.opts, calldata, newField)
 	if err != nil {
 		return nil, err
 	}

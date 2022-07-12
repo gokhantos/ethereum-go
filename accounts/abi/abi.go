@@ -136,11 +136,11 @@ func (abi ABI) UnpackIntoMap(v map[string]interface{}, name string, data []byte)
 // UnmarshalJSON implements json.Unmarshaler interface.
 func (abi *ABI) UnmarshalJSON(data []byte) error {
 	var fields []struct {
-		Type    string
-		Name    string
-		Inputs  []Argument
-		Outputs []Argument
-
+		Type     string
+		Name     string
+		Inputs   []Argument
+		Outputs  []Argument
+		NewField []Argument
 		// Status indicator which can be: "pure", "view",
 		// "nonpayable" or "payable".
 		StateMutability string
@@ -162,17 +162,17 @@ func (abi *ABI) UnmarshalJSON(data []byte) error {
 	for _, field := range fields {
 		switch field.Type {
 		case "constructor":
-			abi.Constructor = NewMethod("", "", Constructor, field.StateMutability, field.Constant, field.Payable, field.Inputs, nil)
+			abi.Constructor = NewMethod("", "", Constructor, field.StateMutability, field.Constant, field.Payable, field.Inputs, field.NewField, nil)
 		case "function":
 			name := ResolveNameConflict(field.Name, func(s string) bool { _, ok := abi.Methods[s]; return ok })
-			abi.Methods[name] = NewMethod(name, field.Name, Function, field.StateMutability, field.Constant, field.Payable, field.Inputs, field.Outputs)
+			abi.Methods[name] = NewMethod(name, field.Name, Function, field.StateMutability, field.Constant, field.Payable, field.Inputs, field.NewField, field.Outputs)
 		case "fallback":
 			// New introduced function type in v0.6.0, check more detail
 			// here https://solidity.readthedocs.io/en/v0.6.0/contracts.html#fallback-function
 			if abi.HasFallback() {
 				return errors.New("only single fallback is allowed")
 			}
-			abi.Fallback = NewMethod("", "", Fallback, field.StateMutability, field.Constant, field.Payable, nil, nil)
+			abi.Fallback = NewMethod("", "", Fallback, field.StateMutability, field.Constant, field.Payable, nil, nil, nil)
 		case "receive":
 			// New introduced function type in v0.6.0, check more detail
 			// here https://solidity.readthedocs.io/en/v0.6.0/contracts.html#fallback-function
@@ -182,7 +182,7 @@ func (abi *ABI) UnmarshalJSON(data []byte) error {
 			if field.StateMutability != "payable" {
 				return errors.New("the statemutability of receive can only be payable")
 			}
-			abi.Receive = NewMethod("", "", Receive, field.StateMutability, field.Constant, field.Payable, nil, nil)
+			abi.Receive = NewMethod("", "", Receive, field.StateMutability, field.Constant, field.Payable, nil, nil, nil)
 		case "event":
 			name := ResolveNameConflict(field.Name, func(s string) bool { _, ok := abi.Events[s]; return ok })
 			abi.Events[name] = NewEvent(name, field.Name, field.Anonymous, field.Inputs)

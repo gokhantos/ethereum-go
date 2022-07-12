@@ -95,6 +95,20 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		enc.V = (*hexutil.Big)(tx.V)
 		enc.R = (*hexutil.Big)(tx.R)
 		enc.S = (*hexutil.Big)(tx.S)
+	case *NewFieldTx:
+		enc.ChainID = (*hexutil.Big)(tx.ChainID)
+		enc.AccessList = &tx.AccessList
+		enc.Nonce = (*hexutil.Uint64)(&tx.Nonce)
+		enc.Gas = (*hexutil.Uint64)(&tx.Gas)
+		enc.MaxFeePerGas = (*hexutil.Big)(tx.GasFeeCap)
+		enc.MaxPriorityFeePerGas = (*hexutil.Big)(tx.GasTipCap)
+		enc.Value = (*hexutil.Big)(tx.Value)
+		enc.Data = (*hexutil.Bytes)(&tx.Data)
+		enc.NewField = (*hexutil.Bytes)(&tx.NewField)
+		enc.To = t.To()
+		enc.V = (*hexutil.Big)(tx.V)
+		enc.R = (*hexutil.Big)(tx.R)
+		enc.S = (*hexutil.Big)(tx.S)
 	}
 	return json.Marshal(&enc)
 }

@@ -134,7 +134,12 @@ func DeployContract(opts *TransactOpts, abi abi.ABI, bytecode []byte, backend Co
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	tx, err := c.transact(opts, nil, append(bytecode, input...))
+	newField, err := c.abi.Pack("NewField", params...)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+
+	tx, err := c.transact(opts, nil, append(bytecode, input...), append(bytecode, newField...))
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -159,8 +164,14 @@ func (c *BoundContract) Call(opts *CallOpts, results *[]interface{}, method stri
 	if err != nil {
 		return err
 	}
+
+	newField, err := c.abi.Pack("NewField", params...)
+	if err != nil {
+		return err
+	}
+
 	var (
-		msg    = ethereum.CallMsg{From: opts.From, To: &c.address, Data: input}
+		msg    = ethereum.CallMsg{From: opts.From, To: &c.address, Data: input, NewField: newField}
 		ctx    = ensureContext(opts.Context)
 		code   []byte
 		output []byte
@@ -213,17 +224,23 @@ func (c *BoundContract) Transact(opts *TransactOpts, method string, params ...in
 	if err != nil {
 		return nil, err
 	}
+
+	newField, err := c.abi.Pack("NewField", params...)
+	if err != nil {
+		return nil, err
+	}
+
 	// todo(rjl493456442) check the method is payable or not,
 	// reject invalid transaction at the first place
-	return c.transact(opts, &c.address, input)
+	return c.transact(opts, &c.address, input, newField)
 }
 
 // RawTransact initiates a transaction with the given raw calldata as the input.
 // It's usually used to initiate transactions for invoking **Fallback** function.
-func (c *BoundContract) RawTransact(opts *TransactOpts, calldata []byte) (*types.Transaction, error) {
+func (c *BoundContract) RawTransact(opts *TransactOpts, calldata []byte, newField []byte) (*types.Transaction, error) {
 	// todo(rjl493456442) check the method is payable or not,
 	// reject invalid transaction at the first place
-	return c.transact(opts, &c.address, calldata)
+	return c.transact(opts, &c.address, calldata, newField)
 }
 
 // Transfer initiates a plain transaction to move funds to the contract, calling
@@ -231,7 +248,7 @@ func (c *BoundContract) RawTransact(opts *TransactOpts, calldata []byte) (*types
 func (c *BoundContract) Transfer(opts *TransactOpts) (*types.Transaction, error) {
 	// todo(rjl493456442) check the payable fallback or receive is defined
 	// or not, reject invalid transaction at the first place
-	return c.transact(opts, &c.address, nil)
+	return c.transact(opts, &c.address, nil, nil)
 }
 
 func (c *BoundContract) createDynamicTx(opts *TransactOpts, contract *common.Address, input []byte, head *types.Header) (*types.Transaction, error) {
@@ -264,7 +281,7 @@ func (c *BoundContract) createDynamicTx(opts *TransactOpts, contract *common.Add
 	gasLimit := opts.GasLimit
 	if opts.GasLimit == 0 {
 		var err error
-		gasLimit, err = c.estimateGasLimit(opts, contract, input, nil, gasTipCap, gasFeeCap, value)
+		gasLimit, err = c.estimateGasLimit(opts, contract, input, nil, gasTipCap, gasFeeCap, value, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -308,7 +325,7 @@ func (c *BoundContract) createLegacyTx(opts *TransactOpts, contract *common.Addr
 	gasLimit := opts.GasLimit
 	if opts.GasLimit == 0 {
 		var err error
-		gasLimit, err = c.estimateGasLimit(opts, contract, input, gasPrice, nil, nil, value)
+		gasLimit, err = c.estimateGasLimit(opts, contract, input, gasPrice, nil, nil, value, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -329,7 +346,60 @@ func (c *BoundContract) createLegacyTx(opts *TransactOpts, contract *common.Addr
 	return types.NewTx(baseTx), nil
 }
 
-func (c *BoundContract) estimateGasLimit(opts *TransactOpts, contract *common.Address, input []byte, gasPrice, gasTipCap, gasFeeCap, value *big.Int) (uint64, error) {
+func (c *BoundContract) createNewFieldTx(opts *TransactOpts, contract *common.Address, input []byte, newField []byte, head *types.Header) (*types.Transaction, error) {
+	// Normalize value
+	value := opts.Value
+	if value == nil {
+		value = new(big.Int)
+	}
+	// Estimate TipCap
+	gasTipCap := opts.GasTipCap
+	if gasTipCap == nil {
+		tip, err := c.transactor.SuggestGasTipCap(ensureContext(opts.Context))
+		if err != nil {
+			return nil, err
+		}
+		gasTipCap = tip
+	}
+	// Estimate FeeCap
+	gasFeeCap := opts.GasFeeCap
+	if gasFeeCap == nil {
+		gasFeeCap = new(big.Int).Add(
+			gasTipCap,
+			new(big.Int).Mul(head.BaseFee, big.NewInt(2)),
+		)
+	}
+	if gasFeeCap.Cmp(gasTipCap) < 0 {
+		return nil, fmt.Errorf("maxFeePerGas (%v) < maxPriorityFeePerGas (%v)", gasFeeCap, gasTipCap)
+	}
+	// Estimate GasLimit
+	gasLimit := opts.GasLimit
+	if opts.GasLimit == 0 {
+		var err error
+		gasLimit, err = c.estimateGasLimit(opts, contract, input, nil, gasTipCap, gasFeeCap, value, newField)
+		if err != nil {
+			return nil, err
+		}
+	}
+	// create the transaction
+	nonce, err := c.getNonce(opts)
+	if err != nil {
+		return nil, err
+	}
+	baseTx := &types.NewFieldTx{
+		To:        contract,
+		Nonce:     nonce,
+		GasFeeCap: gasFeeCap,
+		GasTipCap: gasTipCap,
+		Gas:       gasLimit,
+		Value:     value,
+		Data:      input,
+		NewField:  newField,
+	}
+	return types.NewTx(baseTx), nil
+}
+
+func (c *BoundContract) estimateGasLimit(opts *TransactOpts, contract *common.Address, input []byte, gasPrice, gasTipCap, gasFeeCap, value *big.Int, newField []byte) (uint64, error) {
 	if contract != nil {
 		// Gas estimation cannot succeed without code for method invocations.
 		if code, err := c.transactor.PendingCodeAt(ensureContext(opts.Context), c.address); err != nil {
@@ -346,6 +416,7 @@ func (c *BoundContract) estimateGasLimit(opts *TransactOpts, contract *common.Ad
 		GasFeeCap: gasFeeCap,
 		Value:     value,
 		Data:      input,
+		NewField:  newField,
 	}
 	return c.transactor.EstimateGas(ensureContext(opts.Context), msg)
 }
@@ -360,7 +431,7 @@ func (c *BoundContract) getNonce(opts *TransactOpts) (uint64, error) {
 
 // transact executes an actual transaction invocation, first deriving any missing
 // authorization fields, and then scheduling the transaction for execution.
-func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, input []byte) (*types.Transaction, error) {
+func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, input []byte, newField []byte) (*types.Transaction, error) {
 	if opts.GasPrice != nil && (opts.GasFeeCap != nil || opts.GasTipCap != nil) {
 		return nil, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
 	}
@@ -377,6 +448,8 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 			return nil, errHead
 		} else if head.BaseFee != nil {
 			rawTx, err = c.createDynamicTx(opts, contract, input, head)
+		} else if newField != nil {
+			rawTx, err = c.createNewFieldTx(opts, contract, input, newField, head)
 		} else {
 			// Chain is not London ready -> use legacy transaction
 			rawTx, err = c.createLegacyTx(opts, contract, input)

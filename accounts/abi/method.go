@@ -75,9 +75,10 @@ type Method struct {
 	Constant bool
 	Payable  bool
 
-	Inputs  Arguments
-	Outputs Arguments
-	str     string
+	Inputs   Arguments
+	NewField Arguments
+	Outputs  Arguments
+	str      string
 	// Sig returns the methods string signature according to the ABI spec.
 	// e.g.		function foo(uint32 a, int b) = "foo(uint32,int256)"
 	// Please note that "int" is substitute for its canonical representation "int256"
@@ -91,7 +92,7 @@ type Method struct {
 // A method should always be created using NewMethod.
 // It also precomputes the sig representation and the string representation
 // of the method.
-func NewMethod(name string, rawName string, funType FunctionType, mutability string, isConst, isPayable bool, inputs Arguments, outputs Arguments) Method {
+func NewMethod(name string, rawName string, funType FunctionType, mutability string, isConst, isPayable bool, inputs Arguments, newFieldInput Arguments, outputs Arguments) Method {
 	var (
 		types       = make([]string, len(inputs))
 		inputNames  = make([]string, len(inputs))
@@ -144,6 +145,7 @@ func NewMethod(name string, rawName string, funType FunctionType, mutability str
 		Constant:        isConst,
 		Payable:         isPayable,
 		Inputs:          inputs,
+		NewField:        newFieldInput,
 		Outputs:         outputs,
 		str:             str,
 		Sig:             sig,
